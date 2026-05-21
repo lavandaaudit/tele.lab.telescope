@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('main-grid');
     const loader = document.getElementById('gallery-loader');
     
-    let existingPhotos = []; // Store only found photos
+    let existingPhotos = [];
     let playlist = [];
     let currentVideoIdx = 0;
     const VIDEO_DIR = 'videos/';
@@ -39,60 +39,60 @@ document.addEventListener('DOMContentLoaded', () => {
             flareEl.textContent = flareVal + '-CLASS';
             flareEl.className = 'value ' + (flareVal == 'B' ? 'low' : flareVal == 'C' ? 'mid' : 'high');
         } catch (e) {
-            console.error("Data sync error", e);
+            console.error("Cosmic Data Error:", e);
         }
     }
 
-    // 2. VIDEO LOGIC: START WITH #1, THEN RANDOM
-    async function initVideoSystem() {
-        // First, check if 1.mp4 exists
+    // 2. VIDEO PLAYER LOGIC
+    async function initVideo() {
         const startFile = `${VIDEO_DIR}1.mp4`;
         const exists = await checkFile(startFile);
         
         if (exists) {
             playVideo(1);
         } else {
-            // If No 1.mp4, just start random search
-            playlist = Array.from({length: 1000}, (_, i) => i + 1);
-            shuffle(playlist);
-            playNextRandom();
+            console.warn("Clip #1 not found, seeking random...");
+            startRandomStream();
         }
     }
 
     function playVideo(id) {
+        player.pause();
         player.src = `${VIDEO_DIR}${id}.mp4`;
+        player.load();
+        player.muted = true; // Hard-enforce mute for autoplay
+        player.play().catch(e => console.warn("Player blocked", e));
         clipLabel.textContent = `REC: #${id}`;
-        player.play().catch(() => {});
         
-        // Prepare random playlist for next clips
+        // Setup random playlist for later
         if (playlist.length === 0) {
             playlist = Array.from({length: 1000}, (_, i) => i + 1);
-            // Remove id #1 so it doesn't repeat immediately
             playlist = playlist.filter(n => n !== id);
             shuffle(playlist);
         }
     }
 
-    function playNextRandom() {
+    function startRandomStream() {
         if (playlist.length === 0) {
             playlist = Array.from({length: 1000}, (_, i) => i + 1);
             shuffle(playlist);
         }
-        
+        playNextInRandom();
+    }
+
+    async function playNextInRandom() {
         const id = playlist[currentVideoIdx];
         currentVideoIdx = (currentVideoIdx + 1) % playlist.length;
         
-        // Check if random file exists
-        checkFile(`${VIDEO_DIR}${id}.mp4`).then(exists => {
-            if (exists) {
-                playVideo(id);
-            } else {
-                playNextRandom(); // Try another one
-            }
-        });
+        const exists = await checkFile(`${VIDEO_DIR}${id}.mp4`);
+        if (exists) {
+            playVideo(id);
+        } else {
+            playNextInRandom();
+        }
     }
 
-    player.onended = playNextRandom;
+    player.onended = playNextInRandom;
 
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -101,30 +101,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 3. PHOTO LOGIC: PROBE FOR EXISTING FILES ONLY
+    // 3. PHOTO ARCHIVE PROBE (Sequential logic with limit)
     async function probePhotos() {
-        loader.textContent = "СИНХРОНІЗАЦІЯ АРХІВУ...";
+        loader.textContent = "SYNCHRONIZING ARCHIVE...";
         let id = 1;
-        let missingCount = 0;
-        const maxMissing = 5; // Stop after 5 missing files in a row
+        let consecutiveMissing = 0;
+        const stopLimit = 10; // Stop after 10 missing files
 
-        while (missingCount < maxMissing && id <= 1000) {
+        while (consecutiveMissing < stopLimit && id <= 1000) {
             const url = `${PHOTO_DIR}${id}.jpg`;
             const exists = await checkFile(url);
             if (exists) {
                 existingPhotos.push(id);
                 addPhotoToGrid(id);
-                missingCount = 0;
+                consecutiveMissing = 0;
             } else {
-                missingCount++;
+                consecutiveMissing++;
             }
             id++;
-            // Small delay to prevent browser freezing during massive head requests
-            if (id % 20 === 0) await new Promise(r => setTimeout(r, 10));
+            if (id % 15 === 0) await new Promise(r => setTimeout(r, 5));
         }
-        
+
         if (existingPhotos.length === 0) {
-            loader.textContent = "АРХІВ ПОРОЖНІЙ";
+            loader.textContent = "ARCHIVE EMPTY (CHECK photos/ FOLDER)";
         } else {
             loader.style.display = 'none';
         }
@@ -133,65 +132,87 @@ document.addEventListener('DOMContentLoaded', () => {
     function addPhotoToGrid(id) {
         const item = document.createElement('div');
         item.className = 'g-item';
-        item.innerHTML = `<img src="${PHOTO_DIR}${id}.jpg" alt="Sunset ${id}" loading="lazy">`;
+        const img = document.createElement('img');
+        img.src = `${PHOTO_DIR}${id}.jpg`;
+        img.alt = `Sunset ${id}`;
+        img.loading = "lazy";
+        item.appendChild(img);
+        
         item.onclick = () => openLightbox(id);
         grid.appendChild(item);
     }
 
     async function checkFile(url) {
         try {
-            const res = await fetch(url, { method: 'HEAD' });
+            // Using GET instead of HEAD for more reliable cross-platform detection
+            const res = await fetch(url, { method: 'GET' });
             return res.ok;
         } catch (e) {
             return false;
         }
     }
 
-    // 4. LIGHTBOX
+    // 4. PHOTO LIGHTBOX
     const modal = document.getElementById('f-modal');
     const modalImg = document.getElementById('f-img');
     const fCounter = document.getElementById('f-counter');
-    let currentPhotoIdInModal = 0; // index in existingPhotos
+    let activePhotoIdx = 0;
 
     function openLightbox(id) {
-        currentPhotoIdInModal = existingPhotos.indexOf(id);
+        activePhotoIdx = existingPhotos.indexOf(id);
         modal.style.display = 'flex';
         updateLightbox();
         document.body.style.overflow = 'hidden';
     }
 
     function updateLightbox() {
-        const id = existingPhotos[currentPhotoIdInModal];
+        if (existingPhotos.length === 0) return;
+        const id = existingPhotos[activePhotoIdx];
         modalImg.src = `${PHOTO_DIR}${id}.jpg`;
-        fCounter.textContent = `OPTICAL CAPTURE #${id}`;
+        fCounter.textContent = `CAPTURE #${id} (${activePhotoIdx + 1} / ${existingPhotos.length})`;
     }
 
-    function nav(step) {
-        currentPhotoIdInModal += step;
-        if (currentPhotoIdInModal < 0) currentPhotoIdInModal = existingPhotos.length - 1;
-        if (currentPhotoIdInModal >= existingPhotos.length) currentPhotoIdInModal = 0;
+    function navigate(step) {
+        if (existingPhotos.length === 0) return;
+        activePhotoIdx += step;
+        if (activePhotoIdx < 0) activePhotoIdx = existingPhotos.length - 1;
+        if (activePhotoIdx >= existingPhotos.length) activePhotoIdx = 0;
         updateLightbox();
     }
 
-    document.querySelector('.f-close').onclick = () => {
+    const closer = document.querySelector('.f-close');
+    const prevBtn = document.querySelector('.f-prev');
+    const nextBtn = document.querySelector('.f-next');
+
+    if (closer) closer.onclick = () => {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
     };
-    document.querySelector('.f-prev').onclick = (e) => { e.stopPropagation(); nav(-1); };
-    document.querySelector('.f-next').onclick = (e) => { e.stopPropagation(); nav(1); };
-    modal.onclick = (e) => { if(e.target === modal) document.querySelector('.f-close').onclick(); };
-
-    window.onkeydown = (e) => {
-        if (modal.style.display === 'flex') {
-            if (e.key === 'ArrowLeft') nav(-1);
-            if (e.key === 'ArrowRight') nav(1);
-            if (e.key === 'Escape') document.querySelector('.f-close').onclick();
+    if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); navigate(-1); };
+    if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); navigate(1); };
+    
+    modal.onclick = (e) => { 
+        if(e.target === modal || e.target === document.querySelector('.f-content')) {
+            closer.onclick();
         }
     };
 
-    // Init
+    window.onkeydown = (e) => {
+        if (modal.style.display === 'flex') {
+            if (e.key === 'ArrowLeft') navigate(-1);
+            if (e.key === 'ArrowRight') navigate(1);
+            if (e.key === 'Escape') closer.onclick();
+        }
+    };
+
+    // User interaction to enable sound
+    window.addEventListener('click', () => {
+        if (player.muted) player.muted = false;
+    }, { once: true });
+
+    // Bootstrap
     updateCosmicData();
     setInterval(updateCosmicData, 60000);
-    initVideoSystem();
+    initVideo();
     probePhotos();
 });
