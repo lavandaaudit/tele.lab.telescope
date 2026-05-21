@@ -19,15 +19,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const kpData = await kpRes.json();
             const lastKp = parseFloat(kpData[kpData.length-1].kp_index);
             const kpEl = document.getElementById('kp-val');
-            kpEl.textContent = lastKp.toFixed(1);
-            kpEl.className = 'value ' + (lastKp < 4 ? 'low' : lastKp < 6 ? 'mid' : 'high');
+            if (kpEl) {
+                kpEl.textContent = lastKp.toFixed(1);
+                kpEl.className = 'value ' + (lastKp < 4 ? 'low' : lastKp < 6 ? 'mid' : 'high');
+            }
 
             const windRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json');
             const windData = await windRes.json();
             const lastWind = parseFloat(windData[windData.length-1][2]); 
             const windEl = document.getElementById('wind-val');
-            windEl.innerHTML = `${Math.round(lastWind)} <small>km/s</small>`;
-            windEl.className = 'value ' + (lastWind < 400 ? 'low' : lastWind < 600 ? 'mid' : 'high');
+            if (windEl) {
+                windEl.innerHTML = `${Math.round(lastWind)} <small>km/s</small>`;
+                windEl.className = 'value ' + (lastWind < 400 ? 'low' : lastWind < 600 ? 'mid' : 'high');
+            }
 
             const flareRes = await fetch('https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json');
             const flareData = await flareRes.json();
@@ -37,36 +41,47 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (lastFlare >= 1e-5) flareVal = 'M';
             else if (lastFlare >= 1e-6) flareVal = 'C';
             const flareEl = document.getElementById('flare-val');
-            flareEl.textContent = flareVal + '-CLASS';
-            flareEl.className = 'value ' + (flareVal == 'B' ? 'low' : flareVal == 'C' ? 'mid' : 'high');
+            if (flareEl) {
+                flareEl.textContent = flareVal + '-CLASS';
+                flareEl.className = 'value ' + (flareVal == 'B' ? 'low' : flareVal == 'C' ? 'mid' : 'high');
+            }
         } catch (e) {
-            console.error("Data error", e);
+            console.error("Telemetry Error", e);
         }
     }
 
     // --- VIDEO SYSTEM ---
-    async function initVideo() {
-        // Probe for videos 1...1000
+    async function findVideos() {
+        console.log("Starting video scan...");
+        let consecutiveMiss = 0;
         for (let i = 1; i <= 1000; i++) {
             const exists = await checkFile(`${VIDEO_DIR}${i}.mp4`);
             if (exists) {
                 existingVideos.push(i);
                 addVideoToPlaylist(i);
-            } else if (i > 20 && existingVideos.length < i / 2) {
-                // Heuristic to stop probing if too many miss (but allow some gaps)
-                if (i > existingVideos[existingVideos.length-1] + 10) break;
+                consecutiveMiss = 0;
+            } else {
+                consecutiveMiss++;
             }
-            if (i % 20 === 0) await new Promise(r => setTimeout(r, 5));
+            
+            // Limit search: stop if we miss 10 in a row
+            if (consecutiveMiss > 10) break;
+            
+            // Minimal pause to keep UI responsive
+            if (i % 30 === 0) await new Promise(r => setTimeout(r, 10));
         }
 
-        if (existingVideos.includes(1)) {
-            playVideo(1);
-        } else if (existingVideos.length > 0) {
-            playVideo(existingVideos[0]);
+        if (existingVideos.length > 0) {
+            // First play #1 if exists, otherwise first found
+            const startId = existingVideos.includes(1) ? 1 : existingVideos[0];
+            playVideo(startId);
+        } else {
+            console.warn("No videos found in videos/ folder.");
         }
     }
 
     function addVideoToPlaylist(id) {
+        if (!vList) return;
         const btn = document.createElement('div');
         btn.className = 'v-item';
         btn.textContent = id;
@@ -76,50 +91,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playVideo(id) {
-        player.muted = true; // Hard-enforce mute
+        if (!player) return;
+        player.muted = true;
         player.src = `${VIDEO_DIR}${id}.mp4`;
         clipLabel.textContent = `REC: #${id}`;
         
-        // Update active state in list
         document.querySelectorAll('.v-item').forEach(el => el.classList.remove('active'));
         const activeBtn = document.querySelector(`.v-item[data-id="${id}"]`);
         if (activeBtn) activeBtn.classList.add('active');
 
-        player.play().catch(() => console.log("Waiting for interaction..."));
+        player.play().catch(e => console.log("User interaction required for play."));
         
-        // Update shuffle queue
-        if (playlist.length === 0) {
+        if (playlist.length === 0 && existingVideos.length > 0) {
             playlist = [...existingVideos];
             shuffle(playlist);
         }
     }
 
     function playNextRandom() {
-        if (existingVideos.length === 0) return;
+        if (playlist.length === 0) return;
         currentVideoIdx = (currentVideoIdx + 1) % playlist.length;
         playVideo(playlist[currentVideoIdx]);
     }
 
-    player.onended = playNextRandom;
+    if (player) player.onended = playNextRandom;
 
     // --- PHOTO SYSTEM ---
-    async function probePhotos() {
+    async function findPhotos() {
+        console.log("Starting photo scan...");
         let id = 1;
-        let miss = 0;
-        while (miss < 10 && id <= 1000) {
+        let consecutiveMiss = 0;
+        const stopLimit = 15;
+
+        while (consecutiveMiss < stopLimit && id <= 1000) {
             const exists = await checkFile(`${PHOTO_DIR}${id}.jpg`);
             if (exists) {
                 existingPhotos.push(id);
                 addPhotoToGrid(id);
-                miss = 0;
-            } else { miss++; }
+                consecutiveMiss = 0;
+            } else {
+                consecutiveMiss++;
+            }
             id++;
-            if (id % 20 === 0) await new Promise(r => setTimeout(r, 5));
+            if (id % 30 === 0) await new Promise(r => setTimeout(r, 10));
         }
-        loader.style.display = 'none';
+        if (loader) loader.style.display = 'none';
+        if (existingPhotos.length === 0 && loader) {
+            loader.style.display = 'block';
+            loader.textContent = "OPTICAL ARCHIVE EMPTY";
+        }
     }
 
     function addPhotoToGrid(id) {
+        if (!grid) return;
         const item = document.createElement('div');
         item.className = 'g-item';
         item.innerHTML = `<img src="${PHOTO_DIR}${id}.jpg" loading="lazy">`;
@@ -130,7 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UTILS ---
     async function checkFile(url) {
         try {
-            const res = await fetch(url, { method: 'GET' });
+            // Using random param to force check on server
+            const res = await fetch(url + '?v=' + Math.random(), { method: 'HEAD' });
             return res.ok;
         } catch (e) { return false; }
     }
@@ -150,41 +175,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openLightbox(id) {
         modalIdx = existingPhotos.indexOf(id);
-        modal.style.display = 'flex';
+        if (modal) modal.style.display = 'flex';
         updateLightbox();
         document.body.style.overflow = 'hidden';
     }
 
     function updateLightbox() {
         const id = existingPhotos[modalIdx];
-        modalImg.src = `${PHOTO_DIR}${id}.jpg`;
-        fCounter.textContent = `IMG: #${id} (${modalIdx + 1} / ${existingPhotos.length})`;
+        if (modalImg) modalImg.src = `${PHOTO_DIR}${id}.jpg`;
+        if (fCounter) fCounter.textContent = `IMG: #${id} (${modalIdx + 1} / ${existingPhotos.length})`;
     }
 
     function navigate(step) {
+        if (existingPhotos.length === 0) return;
         modalIdx += step;
         if (modalIdx < 0) modalIdx = existingPhotos.length - 1;
         if (modalIdx >= existingPhotos.length) modalIdx = 0;
         updateLightbox();
     }
 
-    document.querySelector('.f-close').onclick = () => {
-        modal.style.display = 'none';
+    const closeBtn = document.querySelector('.f-close');
+    if (closeBtn) closeBtn.onclick = () => {
+        if (modal) modal.style.display = 'none';
         document.body.style.overflow = 'auto';
     };
-    document.querySelector('.f-prev').onclick = (e) => { e.stopPropagation(); navigate(-1); };
-    document.querySelector('.f-next').onclick = (e) => { e.stopPropagation(); navigate(1); };
+
+    const prevBtn = document.querySelector('.f-prev');
+    const nextBtn = document.querySelector('.f-next');
+    if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); navigate(-1); };
+    if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); navigate(1); };
     
+    if (modal) modal.onclick = (e) => {
+        if (e.target === modal) closeBtn.onclick();
+    };
+
     window.onkeydown = (e) => {
-        if (modal.style.display === 'flex') {
+        if (modal && modal.style.display === 'flex') {
             if (e.key === 'ArrowLeft') navigate(-1);
             if (e.key === 'ArrowRight') navigate(1);
-            if (e.key === 'Escape') document.querySelector('.f-close').onclick();
+            if (e.key === 'Escape') closeBtn.onclick();
         }
     };
 
+    // BOOTSTRAP
     updateCosmicData();
     setInterval(updateCosmicData, 60000);
-    initVideo();
-    probePhotos();
+    findVideos();
+    findPhotos();
 });
