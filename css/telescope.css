@@ -1,0 +1,109 @@
+:root {
+    --bg: #050507;
+    --neon-blue: #00f3ff;
+    --neon-orange: #ff5500;
+    --neon-red: #ff003c;
+    --neon-green: #00ff95;
+    --glass: rgba(255, 255, 255, 0.03);
+    --border: rgba(255, 255, 255, 0.1);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { 
+    background: var(--bg); color: #fff; margin: 0; 
+    font-family: 'Rajdhani', sans-serif; overflow-x: hidden;
+}
+
+/* HUD Styling */
+.telescope-hud {
+    display: flex;
+    flex-direction: column-reverse;
+    padding: 15px;
+    background: linear-gradient(rgba(0,0,0,0.8), transparent);
+    gap: 15px;
+}
+
+@media (min-width: 768px) {
+    .telescope-hud { flex-direction: row-reverse; justify-content: space-between; align-items: flex-start; padding: 30px; }
+}
+
+.logo-area h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 900;
+    margin: 0;
+    text-align: right;
+    letter-spacing: 2px;
+    line-height: 1.2;
+}
+.logo-area h1 span { color: var(--neon-orange); text-shadow: 0 0 15px var(--neon-orange); }
+
+.telemetry-grid { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+.stat-cell {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    padding: 10px 15px;
+    min-width: 100px;
+    border-radius: 4px;
+    backdrop-filter: blur(5px);
+}
+.stat-cell .label { font-size: 0.6rem; color: var(--neon-blue); display: block; letter-spacing: 1px; }
+.stat-cell .value { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 700; margin-top: 4px; display: block; }
+
+/* Alerts */
+.low { color: var(--neon-green); }
+.mid { color: var(--neon-orange); text-shadow: 0 0 10px var(--neon-orange); }
+.high { color: var(--neon-red); text-shadow: 0 0 15px var(--neon-red); }
+
+/* Video Player */
+.video-container { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-bottom: 1px solid var(--border); }
+#p-player { width: 100%; height: 100%; object-fit: cover; }
+
+.player-overlay { position: absolute; bottom: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; pointer-events: none; }
+.on-air { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--neon-red); letter-spacing: 1px; }
+.clip-number { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--neon-blue); }
+
+/* Gallery */
+.gallery-section { padding: 20px 15px; }
+.section-title { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; letter-spacing: 3px; color: var(--border); margin-bottom: 20px; text-transform: uppercase; }
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+}
+
+@media (min-width: 768px) {
+    .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+}
+
+.g-item {
+    aspect-ratio: 1/1;
+    overflow: hidden;
+    background: #111;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+.g-item img { width: 100%; height: 100%; object-fit: cover; }
+.g-item:hover { transform: scale(1.05); border-color: var(--neon-blue); }
+
+.loader { text-align: center; padding: 40px; font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--neon-blue); opacity: 0.5; }
+
+/* Lightbox */
+.f-modal {
+    display: none; position: fixed; z-index: 1000; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95);
+    justify-content: center; align-items: center; backdrop-filter: blur(10px);
+}
+.f-content { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+.f-content img { max-width: 95%; max-height: 90%; object-fit: contain; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+.f-info { position: absolute; top: 30px; left: 30px; font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--neon-blue); }
+.f-close { position: absolute; top: 20px; right: 30px; font-size: 40px; color: #fff; cursor: pointer; z-index: 1001; }
+.f-nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 50px; color: #fff; padding: 30px; cursor: pointer; user-select: none; opacity: 0.3; }
+.f-nav:hover { opacity: 1; color: var(--neon-blue); }
+.f-prev { left: 0; }
+.f-next { right: 0; }
+
+@media (max-width: 768px) {
+    .f-nav { padding: 15px; font-size: 30px; }
+}

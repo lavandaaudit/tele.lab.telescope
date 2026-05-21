@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBONARIUM TV | ON AIR</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/tv.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="tv-body">
+    <div class="tv-screen">
+        <video id="tv-player" autoplay muted playsinline>
+            <!-- TV content -->
+        </video>
+
+        <!-- TV HUD -->
+        <div class="tv-hud">
+            <div class="channel-logo">IBONARIUM <span>TV</span></div>
+            
+            <div class="tv-footer">
+                <div class="footer-top-row">
+                    <div class="program-info" id="current-clip">CLIP: #--</div>
+                    <div class="tv-clock" id="digital-clock">00:00:00</div>
+                </div>
+                <!-- Ticker -->
+                <div class="tv-ticker-wrap">
+                    <div class="tv-ticker-move">
+                        ARXIVE 2026 // CURRENT STREAM: SUNSET SELECTION // TOTAL FILES: 1000 // IBONARIUM PLANETARY OBSERVATION // 
+                        ARXIVE 2026 // CURRENT STREAM: SUNSET SELECTION // TOTAL FILES: 1000 // IBONARIUM PLANETARY OBSERVATION // 
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="static-noise" id="static-noise"></div>
+    </div>
+
+    <script src="js/tv.js"></script>
+</body>
+</html>

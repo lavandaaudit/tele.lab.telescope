@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IBONARIUM SUNSET TELESCOPE</title>
+    <link rel="stylesheet" href="css/telescope.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="telescope-body">
+    <!-- Top HUD: Cosmic Data -->
+    <header class="telescope-hud">
+        <div class="telemetry-grid">
+            <div class="stat-cell" id="kp-box">
+                <span class="label">KP INDEX</span>
+                <span class="value" id="kp-val">--</span>
+            </div>
+            <div class="stat-cell" id="wind-box">
+                <span class="label">SOLAR WIND</span>
+                <span class="value" id="wind-val">-- <small>km/s</small></span>
+            </div>
+            <div class="stat-cell" id="flare-box">
+                <span class="label">LAST FLARE</span>
+                <span class="value" id="flare-val">--</span>
+            </div>
+        </div>
+        <div class="logo-area">
+            <h1>IBONARIUM <span>SUNSET</span> TELESCOPE</h1>
+        </div>
+    </header>
+
+    <main class="telescope-main">
+        <!-- Video Player -->
+        <section class="video-container">
+            <video id="p-player" autoplay muted playsinline></video>
+            <div class="player-overlay">
+                <div class="on-air">● STREAMING ARCHIVE</div>
+                <div class="clip-number" id="clip-id">#--</div>
+            </div>
+        </section>
+
+        <!-- Gallery -->
+        <section class="gallery-section">
+            <h2 class="section-title">OPTICAL ARCHIVE</h2>
+            <div class="gallery-grid" id="main-grid">
+                <!-- Photos injected here -->
+            </div>
+            <div id="gallery-loader" class="loader">СИНХРОНІЗАЦІЯ ДАНИХ...</div>
+        </section>
+    </main>
+
+    <!-- Photo Lightbox -->
+    <div id="f-modal" class="f-modal">
+        <span class="f-close">&times;</span>
+        <div class="f-nav f-prev">&lt;</div>
+        <div class="f-nav f-next">&gt;</div>
+        <div class="f-content">
+            <img id="f-img" src="" alt="">
+            <div class="f-info" id="f-counter"></div>
+        </div>
+    </div>
+
+    <script src="js/telescope.js"></script>
+</body>
+</html>

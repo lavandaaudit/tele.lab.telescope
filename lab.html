@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBONARIUM SUNSET LAB</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/lab.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="lab-body">
+    <div class="lab-hero-section">
+        <!-- Video Player Workspace -->
+        <div class="video-container-full">
+            <video id="lab-video-player" autoplay muted loop playsinline>
+                <!-- Source will be injected via JS -->
+            </video>
+            
+            <!-- HUD Overlay -->
+            <div class="video-hud-minimal">
+                <div class="hud-logo">IBONARIUM <span>SUNSET.LAB</span></div>
+                <div class="hud-file-info" id="current-video-title">САНСЕТ --</div>
+            </div>
+
+            <!-- Bottom Playlist -->
+            <div class="playlist-overlay-bottom">
+                <div class="hud-status-tag">ONLINE</div>
+                <div class="playlist-horizontal-container" id="playlist-container">
+                    <!-- Playlist items injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-container">
+        <!-- Gallery Section -->
+        <section class="gallery-section-lab">
+            <div class="section-header-lab">
+                <h2>АРХІВ САНСЕТІВ</h2>
+                <div class="line-deco-lab"></div>
+            </div>
+            
+            <div class="gallery-wrapper" id="gallery-wrapper">
+                <div class="lab-gallery-grid" id="photo-gallery-grid">
+                    <div class="loading-feed">ЗАВАНТАЖЕННЯ АРХІВУ...</div>
+                </div>
+                <div class="expand-btn-container" id="expand-btn-container" style="display: none;">
+                    <button id="gallery-expand-btn" class="expand-btn">РОЗГОРНУТИ ВЕСЬ АРХІВ</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Photo Modal (Ultra Minimal) -->
+    <div id="photo-modal" class="modal-lab">
+        <span class="modal-close-lab">&times;</span>
+        <div id="modal-prev" class="modal-nav-lab nav-prev-lab">&lt;</div>
+        <div id="modal-next" class="modal-nav-lab nav-next-lab">&gt;</div>
+        <div id="modal-counter-lab"></div>
+        <div class="modal-content-lab">
+            <img id="modal-img" src="" alt="">
+        </div>
+    </div>
+
+    <script src="js/lab.js"></script>
+</body>
+</html>

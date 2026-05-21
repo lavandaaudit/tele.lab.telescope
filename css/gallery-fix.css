@@ -1,0 +1,35 @@
+/* Final Fix for Gallery Rows */
+.gallery-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 15px !important;
+    margin-top: 20px !important;
+    padding: 10px !important;
+    justify-content: flex-start !important;
+}
+
+.gallery-item {
+    flex: 1 0 200px !important; /* Should allow at least 5-6 items on 1400px */
+    max-width: 280px !important; /* Limits the size so they don't become giant */
+    position: relative;
+    border-radius: 15px;
+    overflow: hidden;
+    cursor: pointer;
+    aspect-ratio: 3 / 2;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+    background-color: #111;
+}
+
+.gallery-item img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+@media (max-width: 600px) {
+    .gallery-item {
+        flex: 1 0 100% !important;
+        max-width: 100% !important;
+    }
+}
