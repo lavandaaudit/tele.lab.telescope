@@ -3,14 +3,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const clipLabel = document.getElementById('clip-id');
     const grid = document.getElementById('main-grid');
     const loader = document.getElementById('gallery-loader');
+    const vList = document.getElementById('v-list');
+    const unmuteBtn = document.getElementById('v-unmute');
     
     let existingPhotos = [];
+    let existingVideos = [];
     let playlist = [];
     let currentVideoIdx = 0;
     const VIDEO_DIR = 'videos/';
     const PHOTO_DIR = 'photos/';
 
-    // 1. COSMIC DATA FETCHING (NOAA)
+    // --- COSMIC DATA ---
     async function updateCosmicData() {
         try {
             const kpRes = await fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json');
@@ -34,65 +37,108 @@ document.addEventListener('DOMContentLoaded', () => {
             if (lastFlare >= 1e-4) flareVal = 'X';
             else if (lastFlare >= 1e-5) flareVal = 'M';
             else if (lastFlare >= 1e-6) flareVal = 'C';
-            
             const flareEl = document.getElementById('flare-val');
             flareEl.textContent = flareVal + '-CLASS';
             flareEl.className = 'value ' + (flareVal == 'B' ? 'low' : flareVal == 'C' ? 'mid' : 'high');
         } catch (e) {
-            console.error("Cosmic Data Error:", e);
+            console.error("Data error", e);
         }
     }
 
-    // 2. VIDEO PLAYER LOGIC
+    // --- VIDEO SYSTEM ---
     async function initVideo() {
-        const startFile = `${VIDEO_DIR}1.mp4`;
-        const exists = await checkFile(startFile);
-        
-        if (exists) {
-            playVideo(1);
-        } else {
-            console.warn("Clip #1 not found, seeking random...");
-            startRandomStream();
+        // Probe for videos 1...1000
+        for (let i = 1; i <= 1000; i++) {
+            const exists = await checkFile(`${VIDEO_DIR}${i}.mp4`);
+            if (exists) {
+                existingVideos.push(i);
+                addVideoToPlaylist(i);
+            } else if (i > 20 && existingVideos.length < i / 2) {
+                // Heuristic to stop probing if too many miss (but allow some gaps)
+                if (i > existingVideos[existingVideos.length-1] + 10) break;
+            }
+            if (i % 20 === 0) await new Promise(r => setTimeout(r, 5));
         }
+
+        if (existingVideos.includes(1)) {
+            playVideo(1);
+        } else if (existingVideos.length > 0) {
+            playVideo(existingVideos[0]);
+        }
+    }
+
+    function addVideoToPlaylist(id) {
+        const btn = document.createElement('div');
+        btn.className = 'v-item';
+        btn.textContent = id;
+        btn.dataset.id = id;
+        btn.onclick = () => playVideo(id);
+        vList.appendChild(btn);
     }
 
     function playVideo(id) {
-        player.pause();
         player.src = `${VIDEO_DIR}${id}.mp4`;
-        player.load();
-        player.muted = true; // Hard-enforce mute for autoplay
-        player.play().catch(e => console.warn("Player blocked", e));
         clipLabel.textContent = `REC: #${id}`;
         
-        // Setup random playlist for later
-        if (playlist.length === 0) {
-            playlist = Array.from({length: 1000}, (_, i) => i + 1);
-            playlist = playlist.filter(n => n !== id);
-            shuffle(playlist);
-        }
-    }
+        // Update active state in list
+        document.querySelectorAll('.v-item').forEach(el => el.classList.remove('active'));
+        const activeBtn = document.querySelector(`.v-item[data-id="${id}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
 
-    function startRandomStream() {
-        if (playlist.length === 0) {
-            playlist = Array.from({length: 1000}, (_, i) => i + 1);
-            shuffle(playlist);
-        }
-        playNextInRandom();
-    }
-
-    async function playNextInRandom() {
-        const id = playlist[currentVideoIdx];
-        currentVideoIdx = (currentVideoIdx + 1) % playlist.length;
+        player.play().catch(() => console.log("Waiting for interaction..."));
         
-        const exists = await checkFile(`${VIDEO_DIR}${id}.mp4`);
-        if (exists) {
-            playVideo(id);
-        } else {
-            playNextInRandom();
+        // Update shuffle queue
+        if (playlist.length === 0) {
+            playlist = [...existingVideos];
+            shuffle(playlist);
         }
     }
 
-    player.onended = playNextInRandom;
+    function playNextRandom() {
+        if (existingVideos.length === 0) return;
+        currentVideoIdx = (currentVideoIdx + 1) % playlist.length;
+        playVideo(playlist[currentVideoIdx]);
+    }
+
+    player.onended = playNextRandom;
+
+    unmuteBtn.onclick = () => {
+        player.muted = !player.muted;
+        unmuteBtn.textContent = player.muted ? "UNMUTE AUDIO" : "MUTE AUDIO";
+    };
+
+    // --- PHOTO SYSTEM ---
+    async function probePhotos() {
+        let id = 1;
+        let miss = 0;
+        while (miss < 10 && id <= 1000) {
+            const exists = await checkFile(`${PHOTO_DIR}${id}.jpg`);
+            if (exists) {
+                existingPhotos.push(id);
+                addPhotoToGrid(id);
+                miss = 0;
+            } else { miss++; }
+            id++;
+            if (id % 20 === 0) await new Promise(r => setTimeout(r, 5));
+        }
+        loader.style.display = 'none';
+    }
+
+    function addPhotoToGrid(id) {
+        const item = document.createElement('div');
+        item.className = 'g-item';
+        item.innerHTML = `<img src="${PHOTO_DIR}${id}.jpg" loading="lazy">`;
+        item.onclick = () => openLightbox(id);
+        grid.appendChild(item);
+    }
+
+    // --- UTILS ---
+    async function checkFile(url) {
+        try {
+            const res = await fetch(url, { method: 'GET' });
+            return res.ok;
+        } catch (e) { return false; }
+    }
 
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -101,116 +147,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 3. PHOTO ARCHIVE PROBE (Sequential logic with limit)
-    async function probePhotos() {
-        loader.textContent = "SYNCHRONIZING ARCHIVE...";
-        let id = 1;
-        let consecutiveMissing = 0;
-        const stopLimit = 10; // Stop after 10 missing files
-
-        while (consecutiveMissing < stopLimit && id <= 1000) {
-            const url = `${PHOTO_DIR}${id}.jpg`;
-            const exists = await checkFile(url);
-            if (exists) {
-                existingPhotos.push(id);
-                addPhotoToGrid(id);
-                consecutiveMissing = 0;
-            } else {
-                consecutiveMissing++;
-            }
-            id++;
-            if (id % 15 === 0) await new Promise(r => setTimeout(r, 5));
-        }
-
-        if (existingPhotos.length === 0) {
-            loader.textContent = "ARCHIVE EMPTY (CHECK photos/ FOLDER)";
-        } else {
-            loader.style.display = 'none';
-        }
-    }
-
-    function addPhotoToGrid(id) {
-        const item = document.createElement('div');
-        item.className = 'g-item';
-        const img = document.createElement('img');
-        img.src = `${PHOTO_DIR}${id}.jpg`;
-        img.alt = `Sunset ${id}`;
-        img.loading = "lazy";
-        item.appendChild(img);
-        
-        item.onclick = () => openLightbox(id);
-        grid.appendChild(item);
-    }
-
-    async function checkFile(url) {
-        try {
-            // Using GET instead of HEAD for more reliable cross-platform detection
-            const res = await fetch(url, { method: 'GET' });
-            return res.ok;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    // 4. PHOTO LIGHTBOX
+    // --- LIGHTBOX ---
     const modal = document.getElementById('f-modal');
     const modalImg = document.getElementById('f-img');
     const fCounter = document.getElementById('f-counter');
-    let activePhotoIdx = 0;
+    let modalIdx = 0;
 
     function openLightbox(id) {
-        activePhotoIdx = existingPhotos.indexOf(id);
+        modalIdx = existingPhotos.indexOf(id);
         modal.style.display = 'flex';
         updateLightbox();
         document.body.style.overflow = 'hidden';
     }
 
     function updateLightbox() {
-        if (existingPhotos.length === 0) return;
-        const id = existingPhotos[activePhotoIdx];
+        const id = existingPhotos[modalIdx];
         modalImg.src = `${PHOTO_DIR}${id}.jpg`;
-        fCounter.textContent = `CAPTURE #${id} (${activePhotoIdx + 1} / ${existingPhotos.length})`;
+        fCounter.textContent = `IMG: #${id} (${modalIdx + 1} / ${existingPhotos.length})`;
     }
 
     function navigate(step) {
-        if (existingPhotos.length === 0) return;
-        activePhotoIdx += step;
-        if (activePhotoIdx < 0) activePhotoIdx = existingPhotos.length - 1;
-        if (activePhotoIdx >= existingPhotos.length) activePhotoIdx = 0;
+        modalIdx += step;
+        if (modalIdx < 0) modalIdx = existingPhotos.length - 1;
+        if (modalIdx >= existingPhotos.length) modalIdx = 0;
         updateLightbox();
     }
 
-    const closer = document.querySelector('.f-close');
-    const prevBtn = document.querySelector('.f-prev');
-    const nextBtn = document.querySelector('.f-next');
-
-    if (closer) closer.onclick = () => {
+    document.querySelector('.f-close').onclick = () => {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
     };
-    if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); navigate(-1); };
-    if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); navigate(1); };
+    document.querySelector('.f-prev').onclick = (e) => { e.stopPropagation(); navigate(-1); };
+    document.querySelector('.f-next').onclick = (e) => { e.stopPropagation(); navigate(1); };
     
-    modal.onclick = (e) => { 
-        if(e.target === modal || e.target === document.querySelector('.f-content')) {
-            closer.onclick();
-        }
-    };
-
     window.onkeydown = (e) => {
         if (modal.style.display === 'flex') {
             if (e.key === 'ArrowLeft') navigate(-1);
             if (e.key === 'ArrowRight') navigate(1);
-            if (e.key === 'Escape') closer.onclick();
+            if (e.key === 'Escape') document.querySelector('.f-close').onclick();
         }
     };
 
-    // User interaction to enable sound
-    window.addEventListener('click', () => {
-        if (player.muted) player.muted = false;
-    }, { once: true });
-
-    // Bootstrap
     updateCosmicData();
     setInterval(updateCosmicData, 60000);
     initVideo();
