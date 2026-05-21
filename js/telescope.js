@@ -195,27 +195,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const closeBtn = document.querySelector('.f-close');
-    if (closeBtn) closeBtn.onclick = () => {
+    const closeLightbox = () => {
         if (modal) modal.style.display = 'none';
         document.body.style.overflow = 'auto';
     };
 
+    if (closeBtn) closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeLightbox();
+    });
+
+    if (modal) modal.addEventListener('click', (e) => {
+        if (e.target === modal || e.target.classList.contains('f-content')) {
+            closeLightbox();
+        }
+    });
+
     const prevBtn = document.querySelector('.f-prev');
     const nextBtn = document.querySelector('.f-next');
-    if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); navigate(-1); };
-    if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); navigate(1); };
+    if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigate(-1); });
+    if (nextBtn) nextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigate(1); });
     
-    if (modal) modal.onclick = (e) => {
-        if (e.target === modal) closeBtn.onclick();
-    };
-
-    window.onkeydown = (e) => {
+    window.addEventListener('keydown', (e) => {
         if (modal && modal.style.display === 'flex') {
             if (e.key === 'ArrowLeft') navigate(-1);
             if (e.key === 'ArrowRight') navigate(1);
-            if (e.key === 'Escape') closeBtn.onclick();
+            if (e.key === 'Escape') closeLightbox();
         }
-    };
+    });
 
     // BOOTSTRAP
     updateCosmicData();
