@@ -4,15 +4,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('main-grid');
     const loader = document.getElementById('gallery-loader');
     
-    let photoIndex = 1;
-    let loading = false;
-    let playlist = Array.from({length: 1000}, (_, i) => i + 1);
-    let allPhotos = []; // Index tracking
+    let existingPhotos = []; // Store only found photos
+    let playlist = [];
+    let currentVideoIdx = 0;
+    const VIDEO_DIR = 'videos/';
+    const PHOTO_DIR = 'photos/';
 
     // 1. COSMIC DATA FETCHING (NOAA)
     async function updateCosmicData() {
         try {
-            // K-Index
             const kpRes = await fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json');
             const kpData = await kpRes.json();
             const lastKp = parseFloat(kpData[kpData.length-1].kp_index);
@@ -20,15 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
             kpEl.textContent = lastKp.toFixed(1);
             kpEl.className = 'value ' + (lastKp < 4 ? 'low' : lastKp < 6 ? 'mid' : 'high');
 
-            // Solar Wind
             const windRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json');
             const windData = await windRes.json();
-            const lastWind = parseFloat(windData[windData.length-1][2]); // velocity
+            const lastWind = parseFloat(windData[windData.length-1][2]); 
             const windEl = document.getElementById('wind-val');
             windEl.innerHTML = `${Math.round(lastWind)} <small>km/s</small>`;
             windEl.className = 'value ' + (lastWind < 400 ? 'low' : lastWind < 600 ? 'mid' : 'high');
 
-            // Flares (GOES X-Ray)
             const flareRes = await fetch('https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json');
             const flareData = await flareRes.json();
             const lastFlare = flareData[flareData.length-1].flux;
@@ -40,13 +38,62 @@ document.addEventListener('DOMContentLoaded', () => {
             const flareEl = document.getElementById('flare-val');
             flareEl.textContent = flareVal + '-CLASS';
             flareEl.className = 'value ' + (flareVal == 'B' ? 'low' : flareVal == 'C' ? 'mid' : 'high');
-
         } catch (e) {
-            console.error("Data synchronization error", e);
+            console.error("Data sync error", e);
         }
     }
 
-    // 2. RANDOM VIDEO PLAYER (1-1000)
+    // 2. VIDEO LOGIC: START WITH #1, THEN RANDOM
+    async function initVideoSystem() {
+        // First, check if 1.mp4 exists
+        const startFile = `${VIDEO_DIR}1.mp4`;
+        const exists = await checkFile(startFile);
+        
+        if (exists) {
+            playVideo(1);
+        } else {
+            // If No 1.mp4, just start random search
+            playlist = Array.from({length: 1000}, (_, i) => i + 1);
+            shuffle(playlist);
+            playNextRandom();
+        }
+    }
+
+    function playVideo(id) {
+        player.src = `${VIDEO_DIR}${id}.mp4`;
+        clipLabel.textContent = `REC: #${id}`;
+        player.play().catch(() => {});
+        
+        // Prepare random playlist for next clips
+        if (playlist.length === 0) {
+            playlist = Array.from({length: 1000}, (_, i) => i + 1);
+            // Remove id #1 so it doesn't repeat immediately
+            playlist = playlist.filter(n => n !== id);
+            shuffle(playlist);
+        }
+    }
+
+    function playNextRandom() {
+        if (playlist.length === 0) {
+            playlist = Array.from({length: 1000}, (_, i) => i + 1);
+            shuffle(playlist);
+        }
+        
+        const id = playlist[currentVideoIdx];
+        currentVideoIdx = (currentVideoIdx + 1) % playlist.length;
+        
+        // Check if random file exists
+        checkFile(`${VIDEO_DIR}${id}.mp4`).then(exists => {
+            if (exists) {
+                playVideo(id);
+            } else {
+                playNextRandom(); // Try another one
+            }
+        });
+    }
+
+    player.onended = playNextRandom;
+
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -54,69 +101,75 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    let currentVideoIdx = 0;
-    shuffle(playlist);
+    // 3. PHOTO LOGIC: PROBE FOR EXISTING FILES ONLY
+    async function probePhotos() {
+        loader.textContent = "СИНХРОНІЗАЦІЯ АРХІВУ...";
+        let id = 1;
+        let missingCount = 0;
+        const maxMissing = 5; // Stop after 5 missing files in a row
 
-    function playRandom() {
-        const id = playlist[currentVideoIdx];
-        player.src = `videos/${id}.mp4`;
-        clipLabel.textContent = `REC: #${id}`;
-        player.play().catch(() => {});
-        currentVideoIdx = (currentVideoIdx + 1) % playlist.length;
-    }
-
-    player.onended = playRandom;
-
-    // 3. INFINITE GALLERY (Lazy Load 50 at a time)
-    function loadPhotos(count = 50) {
-        if (photoIndex > 1000 || loading) return;
-        loading = true;
+        while (missingCount < maxMissing && id <= 1000) {
+            const url = `${PHOTO_DIR}${id}.jpg`;
+            const exists = await checkFile(url);
+            if (exists) {
+                existingPhotos.push(id);
+                addPhotoToGrid(id);
+                missingCount = 0;
+            } else {
+                missingCount++;
+            }
+            id++;
+            // Small delay to prevent browser freezing during massive head requests
+            if (id % 20 === 0) await new Promise(r => setTimeout(r, 10));
+        }
         
-        for (let i = 0; i < count; i++) {
-            if (photoIndex > 1000) break;
-            const id = photoIndex;
-            const item = document.createElement('div');
-            item.className = 'g-item';
-            const imgUrl = `photos/${id}.jpg`;
-            item.innerHTML = `<img src="${imgUrl}" alt="Capture ${id}" loading="lazy">`;
-            
-            item.onclick = () => openLightbox(id);
-            grid.appendChild(item);
-            photoIndex++;
+        if (existingPhotos.length === 0) {
+            loader.textContent = "АРХІВ ПОРОЖНІЙ";
+        } else {
+            loader.style.display = 'none';
         }
-        loading = false;
-        if (photoIndex > 1000) loader.style.display = 'none';
     }
 
-    // Infinite Scroll detection
-    window.onscroll = () => {
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) {
-            loadPhotos(25);
-        }
-    };
+    function addPhotoToGrid(id) {
+        const item = document.createElement('div');
+        item.className = 'g-item';
+        item.innerHTML = `<img src="${PHOTO_DIR}${id}.jpg" alt="Sunset ${id}" loading="lazy">`;
+        item.onclick = () => openLightbox(id);
+        grid.appendChild(item);
+    }
 
-    // 4. LIGHTBOX NAVIGATION
+    async function checkFile(url) {
+        try {
+            const res = await fetch(url, { method: 'HEAD' });
+            return res.ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // 4. LIGHTBOX
     const modal = document.getElementById('f-modal');
     const modalImg = document.getElementById('f-img');
     const fCounter = document.getElementById('f-counter');
-    let currentPhotoId = 1;
+    let currentPhotoIdInModal = 0; // index in existingPhotos
 
     function openLightbox(id) {
-        currentPhotoId = id;
+        currentPhotoIdInModal = existingPhotos.indexOf(id);
         modal.style.display = 'flex';
         updateLightbox();
         document.body.style.overflow = 'hidden';
     }
 
     function updateLightbox() {
-        modalImg.src = `photos/${currentPhotoId}.jpg`;
-        fCounter.textContent = `OPTICAL CAPTURE #${currentPhotoId}`;
+        const id = existingPhotos[currentPhotoIdInModal];
+        modalImg.src = `${PHOTO_DIR}${id}.jpg`;
+        fCounter.textContent = `OPTICAL CAPTURE #${id}`;
     }
 
     function nav(step) {
-        currentPhotoId += step;
-        if (currentPhotoId < 1) currentPhotoId = 1000;
-        if (currentPhotoId > 1000) currentPhotoId = 1;
+        currentPhotoIdInModal += step;
+        if (currentPhotoIdInModal < 0) currentPhotoIdInModal = existingPhotos.length - 1;
+        if (currentPhotoIdInModal >= existingPhotos.length) currentPhotoIdInModal = 0;
         updateLightbox();
     }
 
@@ -128,7 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.f-next').onclick = (e) => { e.stopPropagation(); nav(1); };
     modal.onclick = (e) => { if(e.target === modal) document.querySelector('.f-close').onclick(); };
 
-    // Keyboard support
     window.onkeydown = (e) => {
         if (modal.style.display === 'flex') {
             if (e.key === 'ArrowLeft') nav(-1);
@@ -137,9 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Initialize
+    // Init
     updateCosmicData();
-    setInterval(updateCosmicData, 60000); // 1 min sync
-    playRandom();
-    loadPhotos(50);
+    setInterval(updateCosmicData, 60000);
+    initVideoSystem();
+    probePhotos();
 });
