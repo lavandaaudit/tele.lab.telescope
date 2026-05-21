@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('main-grid');
     const loader = document.getElementById('gallery-loader');
     const vList = document.getElementById('v-list');
-    const unmuteBtn = document.getElementById('v-unmute');
     
     let existingPhotos = [];
     let existingVideos = [];
@@ -77,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playVideo(id) {
+        player.muted = true; // Hard-enforce mute
         player.src = `${VIDEO_DIR}${id}.mp4`;
         clipLabel.textContent = `REC: #${id}`;
         
@@ -101,11 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     player.onended = playNextRandom;
-
-    unmuteBtn.onclick = () => {
-        player.muted = !player.muted;
-        unmuteBtn.textContent = player.muted ? "UNMUTE AUDIO" : "MUTE AUDIO";
-    };
 
     // --- PHOTO SYSTEM ---
     async function probePhotos() {
